@@ -1,0 +1,143 @@
+// This is your Prisma schema file — defines the DB schema and maps to AWS RDS PostgreSQL
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Users (Customers) ────────────────────────────────────────────────────────
+
+model User {
+  id               String    @id @default(uuid())
+  name             String
+  phone            String    @unique
+  email            String?   @unique
+  passwordHash     String
+  profileImageUrl  String?
+  age              Int?
+  address          String?
+  homeSize         String?
+  city             String?
+  latitude         Float?
+  longitude        Float?
+  referralCode     String?   @unique @default(dbgenerated("md5(random()::text)"))
+  referralCredits  Int       @default(0)
+  isActive         Boolean   @default(true)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  bookings         Booking[]
+  reviews          Review[]
+
+  @@map("users")
+}
+
+// ─── Workers ──────────────────────────────────────────────────────────────────
+
+model Worker {
+  id               String    @id @default(uuid())
+  name             String
+  phone            String    @unique
+  email            String?   @unique
+  passwordHash     String
+  profileImageUrl  String?
+  serviceType      String    // nanny | japa | babysitting | cleaning | instant
+  bio              String?
+  experienceYears  Int       @default(0)
+  isAvailable      Boolean   @default(true)
+  isVerified       Boolean   @default(false)
+  rating           Float     @default(0.0)
+  totalReviews     Int       @default(0)
+  totalJobs        Int       @default(0)
+  city             String?
+  latitude         Float?
+  longitude        Float?
+  kycVerified      Boolean   @default(false)
+  backgroundChecked Boolean  @default(false)
+  isActive         Boolean   @default(true)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  bookings         Booking[]
+  reviews          Review[]
+
+  @@map("workers")
+}
+
+// ─── Services ─────────────────────────────────────────────────────────────────
+
+model Service {
+  id                 String    @id @default(uuid())
+  name               String
+  category           String    // signature_care | instant
+  description        String?
+  priceHourly        Float     @default(0.0)
+  priceMonthly       Float     @default(0.0)
+  basePricePerHour   Float     // Kept for backward compatibility
+  minHours           Int       @default(4)
+  iconName           String?
+  included           String[]  // "What is included" list
+  excluded           String[]  // "What is not included" list
+  isActive           Boolean   @default(true)
+  createdAt          DateTime  @default(now())
+
+  bookings           Booking[]
+
+  @@map("services")
+}
+
+// ─── Bookings ─────────────────────────────────────────────────────────────────
+
+model Booking {
+  id                  String    @id @default(uuid())
+  userId              String
+  workerId            String?
+  serviceId           String
+  bookingType         String    @default("scheduled") // scheduled | instant
+  status              String    @default("pending")
+  // pending → accepted → in_progress → completed | cancelled
+  scheduledAt         DateTime?
+  startedAt           DateTime?
+  completedAt         DateTime?
+  durationHours       Float
+  address             String
+  city                String?
+  latitude            Float?
+  longitude           Float?
+  specialInstructions String?
+  totalPrice          Float
+  paymentStatus       String    @default("pending") // pending | paid | refunded
+  paymentMethod       String?
+  cancellationReason  String?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  user                User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  worker              Worker?   @relation(fields: [workerId], references: [id], onDelete: SetNull)
+  service             Service   @relation(fields: [serviceId], references: [id])
+  review              Review?
+
+  @@map("bookings")
+}
+
+// ─── Reviews ──────────────────────────────────────────────────────────────────
+
+model Review {
+  id         String   @id @default(uuid())
+  bookingId  String   @unique
+  userId     String
+  workerId   String
+  rating     Int      // 1–5
+  comment    String?
+  createdAt  DateTime @default(now())
+
+  booking    Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [userId], references: [id])
+  worker     Worker   @relation(fields: [workerId], references: [id])
+
+  @@map("reviews")
+}
