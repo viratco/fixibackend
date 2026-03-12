@@ -1,6 +1,42 @@
 import { Request, Response } from 'express';
 import prisma from '../config/prisma';
 
+// ─── Get User Profile ──────────────────────────────────────────
+export async function getMyProfile(req: Request, res: Response): Promise<void> {
+    try {
+        const userId = req.user!.id;
+
+        const user = await prisma.user.findUnique({
+            where: { id: userId },
+            select: {
+                id: true,
+                name: true,
+                phone: true,
+                email: true,
+                age: true,
+                address: true,
+                homeSize: true,
+                city: true,
+                profileImageUrl: true,
+                referralCredits: true,
+                latitude: true,
+                longitude: true,
+                createdAt: true,
+            },
+        });
+
+        if (!user) {
+            res.status(404).json({ error: 'User not found' });
+            return;
+        }
+
+        res.json({ user });
+    } catch (err) {
+        console.error('getMyProfile error:', err);
+        res.status(500).json({ error: 'Failed to fetch profile' });
+    }
+}
+
 // ─── Update User Profile ───────────────────────────────────────
 export async function updateUserProfile(req: Request, res: Response): Promise<void> {
     try {

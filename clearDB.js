@@ -8,6 +8,9 @@ async function main() {
     console.log('Deleting all bookings...');
     await prisma.booking.deleteMany({});
 
+    console.log('Deleting all recurring bookings...');
+    await prisma.recurringBooking.deleteMany({});
+
     console.log('Deleting all users...');
     await prisma.user.deleteMany({});
 

@@ -1,5 +1,3 @@
-// This is your Prisma schema file — defines the DB schema and maps to AWS RDS PostgreSQL
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -9,135 +7,153 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// ─── Users (Customers) ────────────────────────────────────────────────────────
-
 model User {
-  id               String    @id @default(uuid())
-  name             String
-  phone            String    @unique
-  email            String?   @unique
-  passwordHash     String
-  profileImageUrl  String?
-  age              Int?
-  address          String?
-  homeSize         String?
-  city             String?
-  latitude         Float?
-  longitude        Float?
-  referralCode     String?   @unique @default(dbgenerated("md5(random()::text)"))
-  referralCredits  Int       @default(0)
-  isActive         Boolean   @default(true)
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
-
-  bookings         Booking[]
-  reviews          Review[]
+  id              String    @id @default(uuid())
+  name            String
+  phone           String    @unique
+  email           String?   @unique
+  passwordHash    String
+  profileImageUrl String?
+  age             Int?
+  address         String?
+  homeSize        String?
+  city            String?
+  latitude        Float?
+  longitude       Float?
+  referralCode    String?   @unique @default(dbgenerated("md5((random())::text)"))
+  referralCredits Int       @default(0)
+  isActive        Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  bookings           Booking[]
+  reviews            Review[]
+  recurringBookings  RecurringBooking[]
 
   @@map("users")
 }
 
-// ─── Workers ──────────────────────────────────────────────────────────────────
-
 model Worker {
-  id               String    @id @default(uuid())
-  name             String
-  phone            String    @unique
-  email            String?   @unique
-  passwordHash     String
-  profileImageUrl  String?
-  serviceType      String    // nanny | japa | babysitting | cleaning | instant
-  bio              String?
-  experienceYears  Int       @default(0)
-  isAvailable      Boolean   @default(true)
-  isVerified       Boolean   @default(false)
-  rating           Float     @default(0.0)
-  totalReviews     Int       @default(0)
-  totalJobs        Int       @default(0)
-  city             String?
-  latitude         Float?
-  longitude        Float?
-  kycVerified      Boolean   @default(false)
-  backgroundChecked Boolean  @default(false)
-  isActive         Boolean   @default(true)
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
-
-  bookings         Booking[]
-  reviews          Review[]
+  id                String    @id @default(uuid())
+  name              String
+  phone             String    @unique
+  email             String?   @unique
+  passwordHash      String
+  profileImageUrl   String?
+  serviceType       String
+  bio               String?
+  experienceYears   Int       @default(0)
+  isAvailable       Boolean   @default(true)
+  isVerified        Boolean   @default(false)
+  rating            Float     @default(0.0)
+  totalReviews      Int       @default(0)
+  totalJobs         Int       @default(0)
+  city              String?
+  latitude          Float?
+  longitude         Float?
+  kycVerified       Boolean   @default(false)
+  backgroundChecked Boolean   @default(false)
+  isActive          Boolean   @default(true)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  bookings          Booking[]
+  reviews           Review[]
 
   @@map("workers")
 }
 
-// ─── Services ─────────────────────────────────────────────────────────────────
-
 model Service {
-  id                 String    @id @default(uuid())
-  name               String
-  category           String    // signature_care | instant
-  description        String?
-  priceHourly        Float     @default(0.0)
-  priceMonthly       Float     @default(0.0)
-  basePricePerHour   Float     // Kept for backward compatibility
-  minHours           Int       @default(4)
-  iconName           String?
-  included           String[]  // "What is included" list
-  excluded           String[]  // "What is not included" list
-  isActive           Boolean   @default(true)
-  createdAt          DateTime  @default(now())
-
-  bookings           Booking[]
+  id               String    @id @default(uuid())
+  name             String
+  category         String
+  description      String?
+  priceHourly      Float     @default(0.0)
+  basePricePerHour Float
+  minHours         Int       @default(4)
+  iconName         String?
+  included         String[]
+  excluded         String[]
+  isActive         Boolean   @default(true)
+  createdAt        DateTime  @default(now())
+  bookings          Booking[]
+  recurringBookings RecurringBooking[]
 
   @@map("services")
 }
 
-// ─── Bookings ─────────────────────────────────────────────────────────────────
-
 model Booking {
-  id                  String    @id @default(uuid())
+  id                  String            @id @default(uuid())
   userId              String
   workerId            String?
   serviceId           String
-  bookingType         String    @default("scheduled") // scheduled | instant
-  status              String    @default("pending")
-  // pending → accepted → in_progress → completed | cancelled
+  bookingType         BookingType       @default(INSTANT)
+  status              String            @default("pending")
   scheduledAt         DateTime?
   startedAt           DateTime?
   completedAt         DateTime?
-  durationHours       Float
+  durationHours       Float?
   address             String
   city                String?
   latitude            Float?
   longitude           Float?
   specialInstructions String?
   totalPrice          Float
-  paymentStatus       String    @default("pending") // pending | paid | refunded
+  paymentStatus       String            @default("pending")
   paymentMethod       String?
   cancellationReason  String?
-  createdAt           DateTime  @default(now())
-  updatedAt           DateTime  @updatedAt
-
-  user                User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  worker              Worker?   @relation(fields: [workerId], references: [id], onDelete: SetNull)
-  service             Service   @relation(fields: [serviceId], references: [id])
+  recurringBookingId  String?
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+  service             Service           @relation(fields: [serviceId], references: [id])
+  user                User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  worker              Worker?           @relation(fields: [workerId], references: [id])
   review              Review?
+  recurringBooking    RecurringBooking? @relation(fields: [recurringBookingId], references: [id])
 
   @@map("bookings")
 }
 
-// ─── Reviews ──────────────────────────────────────────────────────────────────
+model RecurringBooking {
+  id           String    @id @default(uuid())
+  userId       String
+  serviceId    String
+  status       String    @default("active") // active | paused | completed | cancelled
+  monthsCount  Int
+  startDate    DateTime
+  endDate      DateTime
+  dailyHours   Float     @default(4)
+  startTime    String    // "10:00 AM" — local time string
+  address      String
+  city         String?
+  latitude     Float?
+  longitude    Float?
+  totalPrice   Float
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  service      Service   @relation(fields: [serviceId], references: [id])
+  bookings     Booking[]
+
+  @@map("recurring_bookings")
+}
 
 model Review {
-  id         String   @id @default(uuid())
-  bookingId  String   @unique
-  userId     String
-  workerId   String
-  rating     Int      // 1–5
-  comment    String?
-  createdAt  DateTime @default(now())
-
-  booking    Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
-  user       User     @relation(fields: [userId], references: [id])
-  worker     Worker   @relation(fields: [workerId], references: [id])
+  id        String   @id @default(uuid())
+  bookingId String   @unique
+  userId    String
+  workerId  String
+  rating    Int
+  comment   String?
+  createdAt DateTime @default(now())
+  booking   Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id])
+  worker    Worker   @relation(fields: [workerId], references: [id])
 
   @@map("reviews")
+}
+
+enum BookingType {
+  INSTANT
+  HOURLY
+  SCHEDULED
+  MONTHLY
 }

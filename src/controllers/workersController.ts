@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import prisma from '../config/prisma';
+import { emitWorkerLocation } from '../socket';
 
 // ─── List Workers ──────────────────────────────────────────────
 export async function getWorkers(req: Request, res: Response): Promise<void> {
@@ -164,6 +165,19 @@ export async function updateLocation(req: Request, res: Response): Promise<void>
             data: { latitude: parseFloat(latitude), longitude: parseFloat(longitude) },
             select: { id: true, latitude: true, longitude: true },
         });
+
+        // ── Emit Real-Time Location to Customer ──
+        const activeBooking = await prisma.booking.findFirst({
+            where: {
+                workerId,
+                status: { in: ['accepted', 'on_the_way', 'arrived', 'in_progress'] },
+            },
+            select: { userId: true },
+        });
+
+        if (activeBooking && worker.latitude && worker.longitude) {
+            emitWorkerLocation(activeBooking.userId, worker.latitude, worker.longitude);
+        }
 
         res.json({ message: 'Location updated', worker });
     } catch (err) {

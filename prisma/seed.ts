@@ -18,7 +18,6 @@ async function main() {
             description: 'We provide experienced and caring nannies to look after your little ones. Verified professionals who ensure safety and playful learning.',
             basePricePerHour: 299.0, // Legacy support
             priceHourly: 299.0,
-            priceMonthly: 15000.0,
             minHours: 4,
             iconName: 'baby-face-outline',
             included: [
@@ -41,7 +40,6 @@ async function main() {
             description: 'Traditional postnatal care for mother and newborn. Expert massage, bathing, and nutritional support for recovery.',
             basePricePerHour: 499.0,
             priceHourly: 499.0,
-            priceMonthly: 20000.0,
             minHours: 8,
             iconName: 'mother-heart',
             included: [
@@ -64,7 +62,6 @@ async function main() {
             description: 'On-demand babysitting for date nights or busy days. Trusted sitters who engage children in fun and safe activities.',
             basePricePerHour: 500.0,
             priceHourly: 500.0,
-            priceMonthly: 12000.0,
             minHours: 2,
             iconName: 'human-male-child',
             included: [
@@ -85,7 +82,6 @@ async function main() {
             description: 'Complete home deep cleaning services. We scrub, sanitize, and shine every corner of your home.',
             basePricePerHour: 1500.0,
             priceHourly: 1500.0,
-            priceMonthly: 5000.0,
             minHours: 4,
             iconName: 'broom',
             included: [
@@ -110,7 +106,7 @@ async function main() {
         await prisma.service.upsert({
             where: { id: service.name }, // use name as a rough upsert key
             update: {},
-            create: service,
+            create: { ...service, id: undefined } as any,
         });
     }
 

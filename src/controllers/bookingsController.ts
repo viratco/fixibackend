@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import prisma from '../config/prisma';
+import { emitNewJob, emitJobAccepted, emitJobStatusUpdate } from '../socket';
 
 // In-memory OTP store for booking start/end codes
 const bookingOtpStore = new Map<string, { otp: string; type: string; expiresAt: number }>();
@@ -8,18 +9,21 @@ const bookingOtpStore = new Map<string, { otp: string; type: string; expiresAt: 
 export async function createBooking(req: Request, res: Response): Promise<void> {
     try {
         const userId = req.user!.id;
-        const {
+        let {
             serviceId,
-            bookingType = 'scheduled', // 'hourly' | 'days' | 'scheduled'
+            bookingType = 'SCHEDULED', // INSTANT | SCHEDULED
             scheduledAt,
-            durationHours, // for hourly
-            daysCount,     // for days
+            durationHours,
             address,
             city,
             latitude,
             longitude,
             specialInstructions,
         } = req.body;
+
+        // Normalize legacy or lowercase types
+        bookingType = bookingType.toUpperCase();
+        // HOURLY is now the canonical name for instant bookings. Keep it as-is.
 
         if (!serviceId || !address) {
             res.status(400).json({ error: 'serviceId and address are required' });
@@ -32,22 +36,19 @@ export async function createBooking(req: Request, res: Response): Promise<void> 
             return;
         }
 
-        // Calculate dynamic total price based on bookingType
+        // Calculate dynamic total price
         let totalPrice = 0;
-        if (bookingType === 'days') {
-            totalPrice = service.priceMonthly * (daysCount || 1);
-        } else {
-            // hourly or default
-            totalPrice = service.priceHourly * (durationHours || service.minHours || 1);
+        if (bookingType === 'INSTANT' || bookingType === 'HOURLY' || bookingType === 'SCHEDULED') {
+            totalPrice = service.priceHourly * (parseFloat(durationHours as any) || service.minHours || 1);
         }
 
         const booking = await prisma.booking.create({
             data: {
                 userId,
                 serviceId,
-                bookingType,
-                scheduledAt: scheduledAt ? new Date(scheduledAt) : undefined,
-                durationHours: durationHours || 0,
+                bookingType: bookingType as any,
+                scheduledAt: scheduledAt ? new Date(scheduledAt) : (bookingType === 'INSTANT' || bookingType === 'HOURLY' ? new Date() : undefined),
+                durationHours: parseFloat(durationHours) || 0,
                 address,
                 city,
                 latitude,
@@ -62,10 +63,13 @@ export async function createBooking(req: Request, res: Response): Promise<void> 
             },
         });
 
+        // ── Emit Real-Time Socket Event ──
+        emitNewJob(booking);
+
         res.status(201).json({ message: 'Booking created!', booking });
     } catch (err) {
-        console.error('createBooking error:', err);
-        res.status(500).json({ error: 'Failed to create booking' });
+        console.error('createBooking error details:', err);
+        res.status(500).json({ error: 'Failed to create booking. ' + (err instanceof Error ? err.message : '') });
     }
 }
 
@@ -134,6 +138,9 @@ export async function getBookingById(req: Request, res: Response): Promise<void>
 export async function getWorkerBookings(req: Request, res: Response): Promise<void> {
     try {
         const workerId = req.user!.id;
+        const now = new Date();
+        const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+        const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
 
         const bookings = await prisma.booking.findMany({
             where: { workerId },
@@ -158,11 +165,14 @@ export async function updateBookingStatus(req: Request, res: Response): Promise<
         const { status, cancellationReason } = req.body;
         const { id: actorId, role } = req.user!;
 
-        const validStatuses = ['arrived', 'accepted', 'in_progress', 'completed', 'cancelled'];
+        const validStatuses = ['on_the_way', 'arrived', 'accepted', 'in_progress', 'completed', 'cancelled'];
         if (!validStatuses.includes(status)) {
             res.status(400).json({ error: `Status must be one of: ${validStatuses.join(', ')}` });
             return;
         }
+
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
 
         // Make sure this booking belongs to the actor
         const booking = await prisma.booking.findUnique({ where: { id } });
@@ -187,6 +197,8 @@ export async function updateBookingStatus(req: Request, res: Response): Promise<
             }
         }
 
+
+
         const updateData: Record<string, unknown> = { status };
 
         // If a worker just accepted the job, assign it to them
@@ -208,7 +220,16 @@ export async function updateBookingStatus(req: Request, res: Response): Promise<
             data: updateData,
             include: {
                 service: { select: { name: true } },
-                worker: { select: { name: true } },
+                worker: {
+                    select: {
+                        id: true,
+                        name: true,
+                        phone: true,
+                        rating: true,
+                        profileImageUrl: true,
+                        serviceType: true
+                    }
+                },
             },
         });
 
@@ -220,6 +241,13 @@ export async function updateBookingStatus(req: Request, res: Response): Promise<
             });
         }
 
+        // ── Emit Real-Time Socket Events ──
+        if (status === 'accepted' && role === 'worker' && updated.worker) {
+            emitJobAccepted(updated, updated.worker);
+        } else {
+            emitJobStatusUpdate(booking.userId, updated.id, status);
+        }
+
         res.json({ message: `Booking ${status}`, booking: updated });
     } catch (err) {
         console.error('updateBookingStatus error:', err);
@@ -227,38 +255,98 @@ export async function updateBookingStatus(req: Request, res: Response): Promise<
     }
 }
 
+
+
 // ─── Get Worker's Active Job ───────────────────────────────────
 export async function getWorkerActiveJob(req: Request, res: Response): Promise<void> {
     try {
         const workerId = req.user!.id;
+        const { bookingId: filterId } = req.query;
+        const now = new Date();
+        const fiveMinsLater = new Date(now.getTime() + 5 * 60 * 1000);
 
-        const booking = await prisma.booking.findFirst({
+        // 1. Fetch the primary active booking for this worker
+        const activeBooking = await prisma.booking.findFirst({
             where: {
+                id: filterId ? String(filterId) : undefined,
                 workerId,
                 status: { in: ['accepted', 'arrived', 'in_progress'] },
             },
-            orderBy: { scheduledAt: 'asc' },
             include: {
                 service: { select: { name: true, iconName: true, priceHourly: true } },
-                user: { select: { name: true, phone: true, address: true, latitude: true, longitude: true } },
+                user: { select: { name: true, phone: true, address: true, latitude: true, longitude: true, city: true } },
+            },
+            orderBy: { scheduledAt: 'asc' },
+        });
+
+        // 2. Fetch pending bookings available for this worker
+        const worker = await prisma.worker.findUnique({ where: { id: workerId } });
+
+        // ── City filter: if worker has a city, show their city + cityless jobs.
+        // If worker has NO city set, skip city filter entirely → see ALL jobs.
+        const cityFilter: any = worker?.city
+            ? { OR: [{ city: worker.city }, { city: null }, { city: '' }] }
+            : {}; // no worker city → no restriction
+
+        // ── Service filter: broad matching with 'clean' fallback added.
+        const serviceFilter: any = worker?.serviceType
+            ? {
+                OR: [
+                    { name: { contains: worker.serviceType, mode: 'insensitive' } },
+                    { category: { contains: worker.serviceType.split('_')[0], mode: 'insensitive' } },
+                    { category: { contains: 'care', mode: 'insensitive' } },
+                    { category: { contains: 'home', mode: 'insensitive' } },
+                    { category: { contains: 'clean', mode: 'insensitive' } },
+                ]
+            }
+            : {}; // no serviceType → see all services
+
+        const pending = await prisma.booking.findMany({
+            where: {
+                status: 'pending',
+                workerId: null,
+                AND: [
+                    cityFilter,
+                    {
+                        OR: [
+                            { bookingType: 'HOURLY' as any },
+                            { bookingType: 'INSTANT' as any }, // backwards compat
+                            {
+                                bookingType: 'SCHEDULED' as any,
+                                scheduledAt: { lte: fiveMinsLater }
+                            },
+                            {
+                                bookingType: 'MONTHLY' as any,
+                                scheduledAt: { lte: fiveMinsLater }
+                            }
+                        ]
+                    }
+                ],
+                service: serviceFilter,
+            },
+            orderBy: { createdAt: 'asc' },
+            include: {
+                service: { select: { name: true, iconName: true, priceHourly: true, category: true } },
+                user: { select: { name: true, phone: true, address: true, city: true, email: true, profileImageUrl: true, latitude: true, longitude: true } },
             },
         });
 
-        if (!booking) {
-            // Also check if there are pending bookings that should be assigned to any worker
-            const pending = await prisma.booking.findMany({
-                where: { status: 'pending', workerId: null },
-                orderBy: { createdAt: 'asc' },
-                include: {
-                    service: { select: { name: true, iconName: true, priceHourly: true, category: true } },
-                    user: { select: { name: true, phone: true, address: true, city: true, email: true, profileImageUrl: true, latitude: true, longitude: true } },
-                },
-            });
-            res.json({ booking: null, pendingBookings: pending });
+        // ── Debug logging ─────────────────────────────────────────────────
+        console.log(`[getWorkerActiveJob] Worker: ${workerId} | city: ${worker?.city} | serviceType: ${worker?.serviceType}`);
+        console.log(`[getWorkerActiveJob] Pending jobs found: ${pending.length}`);
+        if (pending.length > 0) {
+            console.log(`[getWorkerActiveJob] First job: ${pending[0].id} | type: ${pending[0].bookingType} | city: ${pending[0].city}`);
+        }
+
+        // ── If worker already has an active job, don't show new jobs ──
+        // A busy worker should focus on their current job only.
+        if (activeBooking) {
+            res.json({ booking: activeBooking, pendingBookings: [] });
             return;
         }
 
-        res.json({ booking, pendingBookings: [] });
+        res.json({ booking: null, pendingBookings: pending });
+
     } catch (err) {
         console.error('getWorkerActiveJob error:', err);
         res.status(500).json({ error: 'Failed to fetch active job' });
@@ -316,7 +404,13 @@ export async function verifyBookingOtp(req: Request, res: Response): Promise<voi
         // OTP valid — clear it
         bookingOtpStore.delete(`${id}:${type}`);
 
-        const booking = await prisma.booking.findFirst({ where: { id, workerId } });
+        const booking = await prisma.booking.findFirst({
+            where: {
+                id,
+                workerId
+            }
+        });
+
         if (!booking) {
             res.status(404).json({ error: 'Booking not found or not assigned to you' });
             return;
@@ -347,5 +441,45 @@ export async function verifyBookingOtp(req: Request, res: Response): Promise<voi
     } catch (err) {
         console.error('verifyBookingOtp error:', err);
         res.status(500).json({ error: 'Failed to verify OTP' });
+    }
+}
+
+// ─── Get Specific Booking for Worker (by ID) ──────────────────────
+export async function getWorkerBookingById(req: Request, res: Response): Promise<void> {
+    try {
+        const workerId = req.user!.id;
+        const { id } = req.params;
+
+        const booking = await prisma.booking.findFirst({
+            where: {
+                id,
+                workerId, // must belong to this worker
+            },
+            include: {
+                service: { select: { name: true, iconName: true, priceHourly: true, category: true } },
+                user: {
+                    select: {
+                        name: true,
+                        phone: true,
+                        address: true,
+                        city: true,
+                        latitude: true,
+                        longitude: true,
+                        email: true,
+                        profileImageUrl: true,
+                    },
+                },
+            },
+        });
+
+        if (!booking) {
+            res.status(404).json({ error: 'Booking not found or not assigned to you' });
+            return;
+        }
+
+        res.json({ booking });
+    } catch (err) {
+        console.error('getWorkerBookingById error:', err);
+        res.status(500).json({ error: 'Failed to fetch booking' });
     }
 }

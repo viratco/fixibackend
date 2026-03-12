@@ -10,7 +10,8 @@ router.post('/login', authController.loginUser);
 router.post('/otp/send', authController.sendOtp);
 router.post('/otp/verify', authController.verifyOtp);
 
-// User profile update (after onboarding)
+// User profile
+router.get('/profile', authMiddleware, profileController.getMyProfile);
 router.patch('/profile', authMiddleware, profileController.updateUserProfile);
 
 router.post('/worker/register', authController.registerWorker);

@@ -1,8 +1,11 @@
 import 'dotenv/config';
+import http from 'http';
 import express from 'express';
 import cors from 'cors';
 import morgan from 'morgan';
 import prisma from './config/prisma';
+import { startRecurringProcessor } from './queue/processor';
+import { initSocket } from './socket';
 
 import authRoutes from './routes/auth';
 import bookingRoutes from './routes/bookings';
@@ -46,12 +49,30 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
 // ─── Start ────────────────────────────────────────────────────
 async function start() {
     try {
-        // Verify DB connection via Prisma
         await prisma.$connect();
         console.log('✅ Database connected (Prisma + PostgreSQL)');
 
-        app.listen(PORT, () => {
-            console.log(`\n🚀 Fixi API running at http://localhost:${PORT}`);
+        // Wrap express in an http.Server so Socket.io can share the port
+        const httpServer = http.createServer(app);
+
+        // Attach Socket.io
+        initSocket(httpServer);
+        console.log('✅ Socket.io attached');
+
+        // ── Start BullMQ recurring booking processor ────────────
+        try {
+            startRecurringProcessor();
+            console.log('✅ Recurring booking queue processor started');
+        } catch (queueErr) {
+            console.warn('⚠️  Could not start queue processor (Redis unavailable?):', (queueErr as Error).message);
+            console.warn('   Monthly recurring bookings will NOT process until Redis is available.');
+        }
+
+        httpServer.listen(PORT, () => {
+            console.log(`\n🚀 Fixi API running at:`);
+            console.log(`   - Local:   http://localhost:${PORT}`);
+            console.log(`   - Network: http://192.168.137.205:${PORT}`);
+            console.log(`   - Socket:  ws://192.168.137.205:${PORT}`);
             console.log(`   Mode: ${process.env.NODE_ENV ?? 'development'}`);
             console.log(`\n📡 Endpoints:`);
             console.log(`   POST /api/auth/register`);
@@ -59,8 +80,10 @@ async function start() {
             console.log(`   POST /api/auth/worker/register`);
             console.log(`   POST /api/auth/worker/login`);
             console.log(`   GET  /api/services`);
-            console.log(`   POST /api/bookings`);
+            console.log(`   POST /api/bookings           (instant/scheduled)`);
+            console.log(`   POST /api/bookings/recurring (monthly subscription)`);
             console.log(`   GET  /api/bookings/my`);
+            console.log(`   GET  /api/bookings/recurring/my`);
             console.log(`   GET  /api/workers`);
         });
     } catch (err) {
