@@ -71,8 +71,8 @@ async function start() {
         httpServer.listen(PORT, () => {
             console.log(`\n🚀 Fixi API running at:`);
             console.log(`   - Local:   http://localhost:${PORT}`);
-            console.log(`   - Network: http://192.168.137.205:${PORT}`);
-            console.log(`   - Socket:  ws://192.168.137.205:${PORT}`);
+            console.log(`   - Network: http://13.232.230.132:${PORT}`);
+            console.log(`   - Socket:  ws://13.232.230.132:${PORT}`);
             console.log(`   Mode: ${process.env.NODE_ENV ?? 'development'}`);
             console.log(`\n📡 Endpoints:`);
             console.log(`   POST /api/auth/register`);

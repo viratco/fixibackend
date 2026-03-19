@@ -64,7 +64,14 @@ export async function createBooking(req: Request, res: Response): Promise<void> 
         });
 
         // ── Emit Real-Time Socket Event ──
-        emitNewJob(booking);
+        // Only broadcast immediate alerts for Instant/Hourly jobs or those starting within 5 mins
+        const isSoon = scheduledAt
+            ? (new Date(scheduledAt).getTime() - Date.now()) <= 5 * 60 * 1000
+            : true;
+
+        if (bookingType === 'INSTANT' || bookingType === 'HOURLY' || isSoon) {
+            emitNewJob(booking);
+        }
 
         res.status(201).json({ message: 'Booking created!', booking });
     } catch (err) {
