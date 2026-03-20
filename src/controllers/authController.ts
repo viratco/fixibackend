@@ -27,7 +27,7 @@ export async function sendOtp(req: Request, res: Response): Promise<void> {
         // Generate a random 4-digit OTP or a fixed one for testing
         // For testing we will just send back the OTP in the response
         // In reality you would integrate Twilio/AWS SNS here
-        const otp = Math.floor(1000 + Math.random() * 9000).toString();
+        const otp = phone === '9999999999' ? '9999' : Math.floor(1000 + Math.random() * 9000).toString();
         const expiresAt = Date.now() + 5 * 60 * 1000; // 5 mins
 
         otpStore.set(phone, { otp, expiresAt });
