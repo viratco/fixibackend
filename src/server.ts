@@ -11,6 +11,7 @@ import authRoutes from './routes/auth';
 import bookingRoutes from './routes/bookings';
 import workerRoutes from './routes/workers';
 import serviceRoutes from './routes/services';
+import addressRoutes from './routes/addresses';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -73,6 +74,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/bookings', bookingRoutes);
 app.use('/api/workers', workerRoutes);
 app.use('/api/services', serviceRoutes);
+app.use('/api/addresses', addressRoutes);
 
 // ─── 404 ──────────────────────────────────────────────────────
 app.use((_req, res) => {
