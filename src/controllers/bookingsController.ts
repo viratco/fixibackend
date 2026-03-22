@@ -153,6 +153,13 @@ export async function getBookingById(req: Request, res: Response): Promise<void>
                         latitude: true, longitude: true,
                     },
                 },
+                // ── Include the linked Address Book entry for precise coordinates ──
+                savedAddress: {
+                    select: {
+                        id: true, label: true, addressLine: true,
+                        landmark: true, latitude: true, longitude: true,
+                    },
+                },
                 review: true,
             },
         });
@@ -310,6 +317,10 @@ export async function getWorkerActiveJob(req: Request, res: Response): Promise<v
             include: {
                 service: { select: { name: true, iconName: true, priceHourly: true } },
                 user: { select: { name: true, phone: true, address: true, latitude: true, longitude: true, city: true } },
+                // ── Include linked Address Book entry ──
+                savedAddress: {
+                    select: { id: true, label: true, addressLine: true, landmark: true, latitude: true, longitude: true },
+                },
             },
             orderBy: { scheduledAt: 'asc' },
         });
@@ -363,6 +374,10 @@ export async function getWorkerActiveJob(req: Request, res: Response): Promise<v
             include: {
                 service: { select: { name: true, iconName: true, priceHourly: true, category: true } },
                 user: { select: { name: true, phone: true, address: true, city: true, email: true, profileImageUrl: true, latitude: true, longitude: true } },
+                // ── Include linked Address Book entry for pending jobs ──
+                savedAddress: {
+                    select: { id: true, label: true, addressLine: true, landmark: true, latitude: true, longitude: true },
+                },
             },
         });
 
