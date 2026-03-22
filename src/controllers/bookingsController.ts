@@ -42,6 +42,21 @@ export async function createBooking(req: Request, res: Response): Promise<void> 
             totalPrice = service.priceHourly * (parseFloat(durationHours as any) || service.minHours || 1);
         }
 
+        // ── Smart Address Resolution ──
+        // The frontend often passes just the label (e.g. "Home") because the header uses `user.address`.
+        // We override the label with the exact address line from their Address Book if it exists.
+        let finalAddressLine = address;
+        const defaultAddress = await prisma.address.findFirst({
+            where: { userId, isDefault: true }
+        });
+        
+        if (defaultAddress) {
+            finalAddressLine = defaultAddress.addressLine;
+            // Ensure coordinates match the address book perfectly if they were somehow missing
+            if (!latitude) latitude = defaultAddress.latitude;
+            if (!longitude) longitude = defaultAddress.longitude;
+        }
+
         const booking = await prisma.booking.create({
             data: {
                 userId,
@@ -49,7 +64,7 @@ export async function createBooking(req: Request, res: Response): Promise<void> 
                 bookingType: bookingType as any,
                 scheduledAt: scheduledAt ? new Date(scheduledAt) : (bookingType === 'INSTANT' || bookingType === 'HOURLY' ? new Date() : undefined),
                 durationHours: parseFloat(durationHours) || 0,
-                address,
+                address: finalAddressLine,
                 city,
                 latitude,
                 longitude,
