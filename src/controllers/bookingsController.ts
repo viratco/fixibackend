@@ -5,13 +5,13 @@ import { emitNewJob, emitJobAccepted, emitJobStatusUpdate } from '../socket';
 // In-memory OTP store for booking start/end codes
 const bookingOtpStore = new Map<string, { otp: string; type: string; expiresAt: number }>();
 
-// ─── Create Booking ────────────────────────────────────────────
+// --- Create Booking ---
 export async function createBooking(req: Request, res: Response): Promise<void> {
     try {
         const userId = req.user!.id;
         let {
             serviceId,
-            bookingType = 'SCHEDULED', // INSTANT | SCHEDULED
+            bookingType = 'SCHEDULED',
             scheduledAt,
             durationHours,
             address,
@@ -19,11 +19,10 @@ export async function createBooking(req: Request, res: Response): Promise<void> 
             latitude,
             longitude,
             specialInstructions,
+            addressId,          // ← specific Address Book ID from the frontend
         } = req.body;
 
-        // Normalize legacy or lowercase types
         bookingType = bookingType.toUpperCase();
-        // HOURLY is now the canonical name for instant bookings. Keep it as-is.
 
         if (!serviceId || !address) {
             res.status(400).json({ error: 'serviceId and address are required' });
@@ -36,25 +35,38 @@ export async function createBooking(req: Request, res: Response): Promise<void> 
             return;
         }
 
-        // Calculate dynamic total price
         let totalPrice = 0;
         if (bookingType === 'INSTANT' || bookingType === 'HOURLY' || bookingType === 'SCHEDULED') {
             totalPrice = service.priceHourly * (parseFloat(durationHours as any) || service.minHours || 1);
         }
 
-        // ── Smart Address Resolution ──
-        // The frontend often passes just the label (e.g. "Home") because the header uses `user.address`.
-        // We override the label with the exact address line from their Address Book if it exists.
+        // ── Smart Address Resolution ──────────────────────────────────────────────
+        // Priority 1: Use the specific addressId the user selected (e.g. "Work").
+        // Priority 2: Use the isDefault address if no specific one was passed.
+        // Priority 3: Use the raw address string as last resort.
         let finalAddressLine = address;
-        const defaultAddress = await prisma.address.findFirst({
-            where: { userId, isDefault: true }
-        });
-        
-        if (defaultAddress) {
-            finalAddressLine = defaultAddress.addressLine;
-            // Ensure coordinates match the address book perfectly if they were somehow missing
-            if (!latitude) latitude = defaultAddress.latitude;
-            if (!longitude) longitude = defaultAddress.longitude;
+        let resolvedAddressId: string | undefined = undefined;
+
+        if (addressId) {
+            const specificAddress = await prisma.address.findFirst({
+                where: { id: addressId, userId }
+            });
+            if (specificAddress) {
+                finalAddressLine = specificAddress.addressLine;
+                latitude = specificAddress.latitude;
+                longitude = specificAddress.longitude;
+                resolvedAddressId = specificAddress.id;
+            }
+        } else {
+            const defaultAddress = await prisma.address.findFirst({
+                where: { userId, isDefault: true }
+            });
+            if (defaultAddress) {
+                finalAddressLine = defaultAddress.addressLine;
+                if (!latitude) latitude = defaultAddress.latitude;
+                if (!longitude) longitude = defaultAddress.longitude;
+                resolvedAddressId = defaultAddress.id;
+            }
         }
 
         const booking = await prisma.booking.create({
@@ -71,6 +83,7 @@ export async function createBooking(req: Request, res: Response): Promise<void> 
                 specialInstructions,
                 totalPrice,
                 status: 'pending',
+                addressId: resolvedAddressId,
             },
             include: {
                 service: { select: { name: true, category: true, iconName: true } },
