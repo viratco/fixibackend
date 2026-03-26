@@ -76,6 +76,66 @@ app.use('/api/workers', workerRoutes);
 app.use('/api/services', serviceRoutes);
 app.use('/api/addresses', addressRoutes);
 
+// ─── Account Deletion Page (Google Play Compliance) ────────────
+app.get('/delete-account', (_req, res) => {
+    res.send(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Delete Account | Fixi Services</title>
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <style>
+                body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; line-height: 1.6; max-width: 600px; margin: 40px auto; padding: 20px; color: #333; }
+                h1 { color: #E53935; }
+                .container { border: 1px solid #ddd; padding: 30px; border-radius: 8px; background: #fff; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+                .step { margin-bottom: 20px; }
+                .step strong { display: block; margin-bottom: 5px; color: #000; }
+                body { background-color: #f9f9f9; }
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <h1>Account Deletion Request</h1>
+                <p>If you wish to delete your Fixi or Fixi Workers account and all associated data, you may do so through the app or by submitting a request to our support team.</p>
+                
+                <div class="step">
+                    <strong>Method 1: In-App Deletion</strong>
+                    1. Open the Fixi or Fixi Workers app<br>
+                    2. Navigate to your Profile/Settings<br>
+                    3. Tap on "Delete Account"<br>
+                    4. Confirm your decision
+                </div>
+
+                <div class="step">
+                    <strong>Method 2: Email Request</strong>
+                    Send an email to <b>support@fixiservices.com</b> with the subject line <i>"Account Deletion Request"</i> from the email address associated with your account. Please include your registered phone number.
+                </div>
+
+                <p><em>Note: Upon deletion, all your personal data, booking history, and preferences will be permanently erased from our active servers in accordance with our Privacy Policy.</em></p>
+                <p><a href="/privacy">View Privacy Policy</a></p>
+            </div>
+        </body>
+        </html>
+    `);
+});
+
+// ─── Root Landing Page ────────────────────────────────────────
+app.get('/', (_req, res) => {
+    res.send(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Fixi Services API</title>
+            <style>body { font-family: sans-serif; text-align: center; margin-top: 50px; }</style>
+        </head>
+        <body>
+            <h1>Fixi Backend API is Running 🚀</h1>
+            <p><a href="/privacy">Privacy Policy</a> | <a href="/delete-account">Account Deletion</a></p>
+        </body>
+        </html>
+    `);
+});
+
 // ─── 404 ──────────────────────────────────────────────────────
 app.use((_req, res) => {
     res.status(404).json({ error: 'Route not found' });
