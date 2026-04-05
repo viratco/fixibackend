@@ -108,14 +108,17 @@ export async function firebaseLogin(req: Request, res: Response): Promise<void> 
             return;
         }
 
-        // Verify the Firebase ID Token
-        const decodedToken = await firebaseAuth.verifyIdToken(idToken);
-        const phone = decodedToken.phone_number?.replace('+91', ''); // Strip prefix to match DB
+        // Verify the Firebase ID Token (force check against revocation)
+        const decodedToken = await firebaseAuth.verifyIdToken(idToken, true);
+        const rawPhone = decodedToken.phone_number;
 
-        if (!phone) {
+        if (!rawPhone) {
             res.status(400).json({ error: 'Invalid token: Phone number not found' });
             return;
         }
+
+        // Strip country code safely — handles +91XXXXXXXXXX
+        const phone = rawPhone.replace(/^\+91/, '');
 
         // Find or create customer
         let user = await prisma.user.findUnique({ where: { phone } });
@@ -149,8 +152,16 @@ export async function firebaseLogin(req: Request, res: Response): Promise<void> 
         });
 
     } catch (err: any) {
-        console.error('firebaseLogin error:', err);
-        res.status(401).json({ error: 'Invalid or expired Firebase token' });
+        // Log the full error for server-side debugging
+        console.error('🔴 [Firebase Login] Token verification failed:', {
+            code: err?.code,
+            message: err?.message,
+        });
+        // Return the Firebase error code to the app so we can see the exact failure reason
+        res.status(401).json({
+            error: err?.code || 'auth/unknown',
+            message: err?.message || 'Invalid or expired Firebase token'
+        });
     }
 }
 
