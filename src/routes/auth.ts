@@ -20,6 +20,7 @@ router.post('/worker/register', authLimiter, authController.registerWorker);
 router.post('/worker/login', authLimiter, authController.loginWorker);
 router.post('/worker/otp/send', otpLimiter, authController.sendWorkerOtp);
 router.post('/worker/otp/verify', authLimiter, authController.verifyWorkerOtp);
+router.post('/worker/firebase-login', authLimiter, authController.firebaseWorkerLogin);
 
 export default router;
 

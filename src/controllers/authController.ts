@@ -389,3 +389,63 @@ export async function verifyWorkerOtp(req: Request, res: Response): Promise<void
     }
 }
 
+export async function firebaseWorkerLogin(req: Request, res: Response): Promise<void> {
+    try {
+        const { idToken } = req.body;
+        if (!idToken) {
+            res.status(400).json({ error: 'ID Token is required' });
+            return;
+        }
+
+        // Verify the Firebase ID Token
+        const decodedToken = await firebaseAuth.verifyIdToken(idToken, true);
+        const rawPhone = decodedToken.phone_number;
+
+        if (!rawPhone) {
+            res.status(400).json({ error: 'Invalid token: Phone number not found' });
+            return;
+        }
+
+        // Strip country code (+91)
+        const phone = rawPhone.replace(/^\+91/, '');
+
+        // Find or create worker
+        let worker = await prisma.worker.findUnique({ where: { phone } });
+        let isNewWorker = false;
+
+        if (!worker) {
+            // New worker registration via Firebase (defaults to 'cleaning' if not specified)
+            const dummyPasswordHash = await bcrypt.hash(Math.random().toString(36), 10);
+            worker = await prisma.worker.create({
+                data: {
+                    phone,
+                    name: 'New Pro',
+                    serviceType: 'cleaning',
+                    passwordHash: dummyPasswordHash
+                }
+            });
+            isNewWorker = true;
+        }
+
+        if (!worker.isActive) {
+            res.status(403).json({ error: 'Account is deactivated' });
+            return;
+        }
+
+        const token = signToken({ id: worker.id, role: 'worker', phone: worker.phone });
+        const { passwordHash: _, ...safeWorker } = worker;
+
+        res.json({
+            message: isNewWorker ? 'Worker account created via Firebase!' : 'Welcome back!',
+            worker: safeWorker,
+            token
+        });
+
+    } catch (err: any) {
+        console.error('🔴 [Firebase Worker Login] Failed:', err?.code, err?.message);
+        res.status(401).json({
+            error: err?.code || 'auth/unknown',
+            message: err?.message || 'Invalid or expired Firebase token'
+        });
+    }
+}
