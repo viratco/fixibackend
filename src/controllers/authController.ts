@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import prisma from '../config/prisma';
 import { JwtPayload } from '../middleware/auth';
+import { auth as firebaseAuth } from '../config/firebase';
 
 import { SignOptions } from 'jsonwebtoken';
 
@@ -96,6 +97,60 @@ export async function verifyOtp(req: Request, res: Response): Promise<void> {
     } catch (err) {
         console.error('verifyOtp error:', err);
         res.status(500).json({ error: 'OTP verification failed' });
+    }
+}
+
+export async function firebaseLogin(req: Request, res: Response): Promise<void> {
+    try {
+        const { idToken } = req.body;
+        if (!idToken) {
+            res.status(400).json({ error: 'ID Token is required' });
+            return;
+        }
+
+        // Verify the Firebase ID Token
+        const decodedToken = await firebaseAuth.verifyIdToken(idToken);
+        const phone = decodedToken.phone_number?.replace('+91', ''); // Strip prefix to match DB
+
+        if (!phone) {
+            res.status(400).json({ error: 'Invalid token: Phone number not found' });
+            return;
+        }
+
+        // Find or create customer
+        let user = await prisma.user.findUnique({ where: { phone } });
+        let isNewUser = false;
+
+        if (!user) {
+            // New user from Firebase
+            const dummyPasswordHash = await bcrypt.hash(Math.random().toString(36), 10);
+            user = await prisma.user.create({
+                data: {
+                    phone,
+                    name: 'Customer',
+                    passwordHash: dummyPasswordHash
+                }
+            });
+            isNewUser = true;
+        }
+
+        if (!user.isActive) {
+            res.status(403).json({ error: 'Account is deactivated' });
+            return;
+        }
+
+        const token = signToken({ id: user.id, role: 'user', phone: user.phone });
+        const { passwordHash: _, ...safeUser } = user;
+
+        res.json({
+            message: isNewUser ? 'Account created via Firebase!' : 'Welcome back!',
+            user: safeUser,
+            token
+        });
+
+    } catch (err: any) {
+        console.error('firebaseLogin error:', err);
+        res.status(401).json({ error: 'Invalid or expired Firebase token' });
     }
 }
 

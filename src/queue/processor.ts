@@ -43,7 +43,7 @@ export function startRecurringProcessor(): Worker {
                 return { skipped: true, reason: recurringBooking?.status ?? 'not found' };
             }
 
-            // ── Step 2: Fetch service for price calculation ─────────────────
+            // ── Step 2: Fetch service for price calculation ──────────────
             const service = await prisma.service.findUnique({ where: { id: serviceId } });
             if (!service) throw new Error(`Service ${serviceId} not found`);
 

@@ -9,6 +9,7 @@ router.post('/register', authController.registerUser);
 router.post('/login', authController.loginUser);
 router.post('/otp/send', authController.sendOtp);
 router.post('/otp/verify', authController.verifyOtp);
+router.post('/firebase-login', authController.firebaseLogin);
 
 // User profile
 router.get('/profile', authMiddleware, profileController.getMyProfile);
