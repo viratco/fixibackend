@@ -2,3 +2,6 @@ node_modules/
 dist/
 .env
 *.js.map
+
+# 🔐 Secret keys - NEVER commit these
+firebase-service-account.json
