@@ -16,6 +16,7 @@ export async function createRecurringBooking(req: Request, res: Response): Promi
             city,
             latitude,
             longitude,
+            addressId,
         } = req.body;
 
         if (!serviceId || !monthsCount || !startDate || !address || !startTime) {
@@ -42,6 +43,27 @@ export async function createRecurringBooking(req: Request, res: Response): Promi
         const dailyPrice = service.priceHourly * parseFloat(String(dailyHours));
         const totalPrice = parseFloat((dailyPrice * totalDays).toFixed(2));
 
+        // ── Smart Address Resolution ──────────────────────────────────────────────
+        let finalAddressLine = address;
+        let finalLatitude = latitude !== undefined && latitude !== null ? parseFloat(latitude as any) : undefined;
+        let finalLongitude = longitude !== undefined && longitude !== null ? parseFloat(longitude as any) : undefined;
+        let resolvedAddressId: string | undefined = addressId;
+
+        // Note: For recurring we don't fallback to default if payload is missing (different from createBooking)
+        // because frontend always requires passing an address explicitly before scheduling.
+        if (resolvedAddressId) {
+            const specificAddress = await prisma.address.findFirst({
+                where: { id: resolvedAddressId, userId }
+            });
+            if (specificAddress) {
+                finalAddressLine = finalAddressLine || specificAddress.addressLine;
+                if (finalLatitude === undefined) finalLatitude = specificAddress.latitude;
+                if (finalLongitude === undefined) finalLongitude = specificAddress.longitude;
+            } else {
+                resolvedAddressId = undefined; // ID was invalid
+            }
+        }
+
         // ── Create master RecurringBooking ─────────────────────────────
         const recurringBooking = await prisma.recurringBooking.create({
             data: {
@@ -52,10 +74,11 @@ export async function createRecurringBooking(req: Request, res: Response): Promi
                 endDate: end,
                 dailyHours: parseFloat(String(dailyHours)),
                 startTime,
-                address,
+                address: finalAddressLine,
                 city,
-                latitude: latitude ? parseFloat(String(latitude)) : undefined,
-                longitude: longitude ? parseFloat(String(longitude)) : undefined,
+                latitude: finalLatitude,
+                longitude: finalLongitude,
+                addressId: resolvedAddressId,
                 totalPrice,
                 status: 'active',
             },
@@ -73,10 +96,11 @@ export async function createRecurringBooking(req: Request, res: Response): Promi
             start,
             end,
             parseFloat(String(dailyHours)),
-            address,
+            finalAddressLine,
             city,
-            latitude ? parseFloat(String(latitude)) : undefined,
-            longitude ? parseFloat(String(longitude)) : undefined,
+            finalLatitude,
+            finalLongitude,
+            resolvedAddressId,
         );
 
         res.status(201).json({

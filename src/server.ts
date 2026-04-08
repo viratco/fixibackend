@@ -13,6 +13,7 @@ import bookingRoutes from './routes/bookings';
 import workerRoutes from './routes/workers';
 import serviceRoutes from './routes/services';
 import addressRoutes from './routes/addresses';
+import adminRoutes from './routes/admin';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -76,6 +77,7 @@ app.use('/api/bookings', bookingRoutes);
 app.use('/api/workers', workerRoutes);
 app.use('/api/services', serviceRoutes);
 app.use('/api/addresses', addressRoutes);
+app.use('/api/admin', adminRoutes);
 
 // ─── Account Deletion Page (Google Play Compliance) ────────────
 app.get('/delete-account', (_req, res) => {

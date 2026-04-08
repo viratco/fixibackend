@@ -41,31 +41,41 @@ export async function createBooking(req: Request, res: Response): Promise<void> 
         }
 
         // ── Smart Address Resolution ──────────────────────────────────────────────
-        // Priority 1: Use the specific addressId the user selected (e.g. "Work").
-        // Priority 2: Use the isDefault address if no specific one was passed.
-        // Priority 3: Use the raw address string as last resort.
+        // The frontend is the Source of Truth. It explicitly sends the selected address & coordinates.
+        // We only use the Address Book to link the booking ID (`addressId`), or act as a last resort fallback.
+        
+        // Start with explicitly provided data
         let finalAddressLine = address;
-        let resolvedAddressId: string | undefined = undefined;
+        let finalLatitude = latitude !== undefined && latitude !== null ? parseFloat(latitude as any) : undefined;
+        let finalLongitude = longitude !== undefined && longitude !== null ? parseFloat(longitude as any) : undefined;
+        let resolvedAddressId: string | undefined = addressId;
 
-        if (addressId) {
+        // Priority 1: If an explicit addressId was provided, verify it and use it as a fallback for missing data
+        if (resolvedAddressId) {
             const specificAddress = await prisma.address.findFirst({
-                where: { id: addressId, userId }
+                where: { id: resolvedAddressId, userId }
             });
             if (specificAddress) {
-                finalAddressLine = specificAddress.addressLine;
-                latitude = specificAddress.latitude;
-                longitude = specificAddress.longitude;
-                resolvedAddressId = specificAddress.id;
+                // Fill in blanks from DB if frontend missed something, otherwise trust frontend string/coords
+                finalAddressLine = finalAddressLine || specificAddress.addressLine;
+                if (finalLatitude === undefined) finalLatitude = specificAddress.latitude;
+                if (finalLongitude === undefined) finalLongitude = specificAddress.longitude;
+            } else {
+                resolvedAddressId = undefined; // ID was invalid
             }
         } else {
-            const defaultAddress = await prisma.address.findFirst({
-                where: { userId, isDefault: true }
-            });
-            if (defaultAddress) {
-                finalAddressLine = defaultAddress.addressLine;
-                if (!latitude) latitude = defaultAddress.latitude;
-                if (!longitude) longitude = defaultAddress.longitude;
-                resolvedAddressId = defaultAddress.id;
+            // Priority 2: Completely missing payload? Fallback to user's Default Address.
+            // IMPORTANT: We do NOT blindly overwrite the explicit address with default address anymore.
+            if (!finalAddressLine || finalLatitude === undefined || finalLongitude === undefined) {
+                const defaultAddress = await prisma.address.findFirst({
+                    where: { userId, isDefault: true }
+                });
+                if (defaultAddress) {
+                    finalAddressLine = finalAddressLine || defaultAddress.addressLine;
+                    if (finalLatitude === undefined) finalLatitude = defaultAddress.latitude;
+                    if (finalLongitude === undefined) finalLongitude = defaultAddress.longitude;
+                    resolvedAddressId = defaultAddress.id;
+                }
             }
         }
 
@@ -78,8 +88,8 @@ export async function createBooking(req: Request, res: Response): Promise<void> 
                 durationHours: parseFloat(durationHours) || 0,
                 address: finalAddressLine,
                 city,
-                latitude,
-                longitude,
+                latitude: finalLatitude,
+                longitude: finalLongitude,
                 specialInstructions,
                 totalPrice,
                 status: 'pending',

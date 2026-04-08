@@ -46,6 +46,7 @@ model Address {
   updatedAt   DateTime @updatedAt
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   bookings    Booking[]
+  recurringBookings RecurringBooking[]
 
   @@map("addresses")
 }
@@ -146,11 +147,13 @@ model RecurringBooking {
   city         String?
   latitude     Float?
   longitude    Float?
+  addressId    String?   // Added to consistently link the saved address
   totalPrice   Float
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
   user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   service      Service   @relation(fields: [serviceId], references: [id])
+  savedAddress Address?  @relation(fields: [addressId], references: [id])
   bookings     Booking[]
 
   @@map("recurring_bookings")

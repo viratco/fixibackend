@@ -8,6 +8,7 @@ export interface RecurringJobData {
     city?: string;
     latitude?: number;
     longitude?: number;
+    addressId?: string;
     dailyHours: number;
     dayIndex: number;   // 1-based day number (Day 1, Day 2, …)
     scheduledAt: string; // ISO string of when this specific day's job runs
@@ -30,6 +31,7 @@ export async function scheduleRecurringJobs(
     city?: string,
     latitude?: number,
     longitude?: number,
+    addressId?: string,
 ): Promise<string[]> {
     const jobIds: string[] = [];
     const now = Date.now();
@@ -52,6 +54,7 @@ export async function scheduleRecurringJobs(
                 city,
                 latitude,
                 longitude,
+                addressId,
                 dailyHours,
                 dayIndex,
                 scheduledAt: scheduledAt.toISOString(),

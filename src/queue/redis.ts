@@ -20,6 +20,7 @@ export interface RecurringJobData {
     city?: string;
     latitude?: number;
     longitude?: number;
+    addressId?: string;
     dailyHours: number;
     dayIndex: number;
     scheduledAt: string; // ISO string

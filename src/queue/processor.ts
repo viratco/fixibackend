@@ -24,6 +24,7 @@ export function startRecurringProcessor(): Worker {
                 city,
                 latitude,
                 longitude,
+                addressId,
                 dailyHours,
                 dayIndex,
                 scheduledAt,
