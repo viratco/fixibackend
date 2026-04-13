@@ -17,6 +17,8 @@ export async function createRecurringBooking(req: Request, res: Response): Promi
             latitude,
             longitude,
             addressId,
+            targetAge,
+            religionPreference,
         } = req.body;
 
         if (!serviceId || !monthsCount || !startDate || !address || !startTime) {
@@ -79,6 +81,8 @@ export async function createRecurringBooking(req: Request, res: Response): Promi
                 latitude: finalLatitude,
                 longitude: finalLongitude,
                 addressId: resolvedAddressId,
+                targetAge,
+                religionPreference,
                 totalPrice,
                 status: 'active',
             },

@@ -20,6 +20,8 @@ export async function createBooking(req: Request, res: Response): Promise<void> 
             longitude,
             specialInstructions,
             addressId,          // ← specific Address Book ID from the frontend
+            targetAge,
+            religionPreference,
         } = req.body;
 
         bookingType = bookingType.toUpperCase();
@@ -94,6 +96,8 @@ export async function createBooking(req: Request, res: Response): Promise<void> 
                 totalPrice,
                 status: 'pending',
                 addressId: resolvedAddressId,
+                targetAge,
+                religionPreference,
             },
             include: {
                 service: { select: { name: true, category: true, iconName: true } },
