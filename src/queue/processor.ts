@@ -2,6 +2,7 @@ import { Worker } from 'bullmq';
 import prisma from '../config/prisma';
 import { redisConnection } from './redis';
 import type { RecurringJobData } from './redis';
+import { sendJobAlertToWorkers } from '../utils/firebasePush';
 
 /**
  * BullMQ Worker — processes one recurring booking job at a time.
@@ -77,6 +78,11 @@ export function startRecurringProcessor(): Worker {
             ]);
 
             console.log(`✅ Created Day ${dayIndex} booking: ${booking.id} (${svc?.name}) for ${usr?.name}`);
+
+            if (svc) {
+                // Trigger push notification to available workers
+                sendJobAlertToWorkers(serviceId, booking.id, svc.name);
+            }
 
             // ── Step 4: Check if this was the last day ───────────────────────
             const endDate = new Date(recurringBooking.endDate);

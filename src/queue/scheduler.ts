@@ -42,10 +42,8 @@ export async function scheduleRecurringJobs(
 
     while (current <= endDate) {
         const scheduledAt = new Date(current);
-        // Fire the job 10 minutes early so the record is created in the DB in time 
-        // to be visible in the worker app's 5-minute pre-start window.
-        const delay = (scheduledAt.getTime() - 600000) - now;
-        
+        const delay = scheduledAt.getTime() - now;
+
         // Only schedule future jobs (or jobs that just turned past within the last 30 seconds for test starts)
         if (delay >= -30000) {
             const finalDelay = Math.max(0, delay);

@@ -185,3 +185,27 @@ export async function updateLocation(req: Request, res: Response): Promise<void>
         res.status(500).json({ error: 'Failed to update location' });
     }
 }
+
+// ─── Update Worker FCM Token ───────────────────────────────────
+export async function updateFcmToken(req: Request, res: Response): Promise<void> {
+    try {
+        const workerId = req.user!.id;
+        const { fcmToken } = req.body;
+
+        if (typeof fcmToken !== 'string') {
+            res.status(400).json({ error: 'fcmToken must be a string' });
+            return;
+        }
+
+        const worker = await prisma.worker.update({
+            where: { id: workerId },
+            data: { fcmToken },
+            select: { id: true, fcmToken: true },
+        });
+
+        res.json({ message: 'FCM Token updated successfully', worker });
+    } catch (err) {
+        console.error('updateFcmToken error:', err);
+        res.status(500).json({ error: 'Failed to update FCM Token' });
+    }
+}

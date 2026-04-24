@@ -73,6 +73,7 @@ model Worker {
   kycVerified       Boolean   @default(false)
   backgroundChecked Boolean   @default(false)
   isActive          Boolean   @default(true)
+  fcmToken          String?
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
   bookings          Booking[]

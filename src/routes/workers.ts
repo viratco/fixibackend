@@ -12,4 +12,7 @@ router.get('/:id', workersController.getWorkerById);
 // Update live location (for active jobs)
 router.put('/location', workerAuthMiddleware, workersController.updateLocation);
 
+// Update FCM Token for push notifications
+router.put('/fcm-token', workerAuthMiddleware, workersController.updateFcmToken);
+
 export default router;

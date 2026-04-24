@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import prisma from '../config/prisma';
 import { emitNewJob, emitJobAccepted, emitJobStatusUpdate } from '../socket';
+import { sendJobAlertToWorkers } from '../utils/firebasePush';
 
 // In-memory OTP store for booking start/end codes
 const bookingOtpStore = new Map<string, { otp: string; type: string; expiresAt: number }>();
@@ -113,6 +114,9 @@ export async function createBooking(req: Request, res: Response): Promise<void> 
 
         if (bookingType === 'INSTANT' || bookingType === 'HOURLY' || isSoon) {
             emitNewJob(booking);
+            // ── Send Push Notification to Workers ──
+            const svc = await prisma.service.findUnique({ where: { id: serviceId } });
+            if (svc) sendJobAlertToWorkers(serviceId, booking.id, svc.name);
         }
 
         res.status(201).json({ message: 'Booking created!', booking });
