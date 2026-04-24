@@ -16,7 +16,7 @@ model User {
   profileImageUrl String?
   age             Int?
   address         String?
-  homeSize        String?c
+  homeSize        String?
   city            String?
   latitude        Float?
   longitude       Float?
