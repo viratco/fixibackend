@@ -33,8 +33,11 @@ export async function createRecurringBooking(req: Request, res: Response): Promi
         }
 
         // ── Compute date range ────────────────────────────────────────
-        // Use the actual startDate the customer selected (frontend enforces 3-day buffer)
+        // Use the actual time the customer selected, but OVERRIDE the date to TODAY for testing
+        // This overrides the frontend's 3-day buffer without needing frontend changes
         const start = new Date(startDate);
+        const now = new Date();
+        start.setFullYear(now.getFullYear(), now.getMonth(), now.getDate());
         
         const end = new Date(start);
         end.setMonth(end.getMonth() + parseInt(monthsCount));
