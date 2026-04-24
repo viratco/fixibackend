@@ -33,8 +33,10 @@ export async function createRecurringBooking(req: Request, res: Response): Promi
         }
 
         // ── Compute date range ────────────────────────────────────────
-        const start = new Date(startDate);
-        const end = new Date(startDate);
+        // TEMPORARY OVERRIDE FOR TESTING: Force start to today
+        const start = new Date(); // Use "Now" instead of the 3-day buffer date from prod app
+        
+        const end = new Date(start);
         end.setMonth(end.getMonth() + parseInt(monthsCount));
         end.setDate(end.getDate() - 1); // endDate is inclusive last day
 
