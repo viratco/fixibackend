@@ -44,8 +44,9 @@ export async function scheduleRecurringJobs(
         const scheduledAt = new Date(current);
         const delay = scheduledAt.getTime() - now;
 
-        // Only schedule future jobs (skip days already in the past)
-        if (delay > 0) {
+        // Only schedule future jobs (or jobs that just turned past within the last 30 seconds for test starts)
+        if (delay >= -30000) {
+            const finalDelay = Math.max(0, delay);
             const jobData: RecurringJobData = {
                 recurringBookingId,
                 userId,
@@ -60,16 +61,20 @@ export async function scheduleRecurringJobs(
                 scheduledAt: scheduledAt.toISOString(),
             };
 
-            const job = await recurringQueue.add(
-                `day-${dayIndex}`,
-                jobData,
-                {
-                    delay,
-                    jobId: `recurring-${recurringBookingId}-day-${dayIndex}`,
-                }
-            );
-
-            jobIds.push(job.id!);
+            try {
+                const job = await recurringQueue.add(
+                    `day-${dayIndex}`,
+                    jobData,
+                    {
+                        delay: finalDelay,
+                        jobId: `recurring-${recurringBookingId}-day-${dayIndex}`,
+                    }
+                );
+                jobIds.push(job.id!);
+            } catch (jobErr) {
+                console.error(`❌ Failed to add Day ${dayIndex} to queue:`, (jobErr as Error).message);
+                // Continue to next day even if one fails
+            }
         }
 
         // Advance to next calendar day, same time

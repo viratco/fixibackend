@@ -44,7 +44,9 @@ export async function createRecurringBooking(req: Request, res: Response): Promi
         const totalDays = Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
 
         // ── Total price = daily price * number of days ─────────────────
-        const dailyPrice = service.priceHourly * parseFloat(String(dailyHours));
+        // Fallback to basePricePerHour if priceHourly is missing or 0
+        const hourlyRate = service.priceHourly || (service as any).basePricePerHour || 0;
+        const dailyPrice = hourlyRate * parseFloat(String(dailyHours));
         const totalPrice = parseFloat((dailyPrice * totalDays).toFixed(2));
 
         // ── Smart Address Resolution (3-level fallback) ───────────────────────────
@@ -137,9 +139,10 @@ export async function createRecurringBooking(req: Request, res: Response): Promi
 
         res.status(201).json({
             message: `Monthly booking created! ${jobIds.length} daily jobs scheduled.`,
-            recurringBooking,
+            recurringBookingId: recurringBooking.id,
             scheduledJobs: jobIds.length,
             totalDays,
+            startDate: start.toISOString(),
         });
     } catch (err) {
         console.error('createRecurringBooking error:', err);
