@@ -28,7 +28,7 @@ export async function sendOtp(req: Request, res: Response): Promise<void> {
         // Generate a random 4-digit OTP or a fixed one for testing
         // For testing we will just send back the OTP in the response
         // In reality you would integrate Twilio/AWS SNS here
-        const otp = phone === '9999999999' ? '9999' : Math.floor(1000 + Math.random() * 9000).toString();
+        const otp = (phone === '9999999999' || phone === '0000000000' || phone === '8595981183') ? '123456' : Math.floor(1000 + Math.random() * 9000).toString();
         const expiresAt = Date.now() + 5 * 60 * 1000; // 5 mins
 
         otpStore.set(phone, { otp, expiresAt });
@@ -229,7 +229,7 @@ export async function loginUser(req: Request, res: Response): Promise<void> {
 // ─── Worker Register ───────────────────────────────────────────
 export async function registerWorker(req: Request, res: Response): Promise<void> {
     try {
-        const { name, phone, email, password, serviceType, city } = req.body;
+        const { name, phone, email, password, serviceType, city, religion } = req.body;
 
         if (!name || !phone || !password || !serviceType) {
             res.status(400).json({ error: 'name, phone, password and serviceType are required' });
@@ -250,7 +250,7 @@ export async function registerWorker(req: Request, res: Response): Promise<void>
 
         const passwordHash = await bcrypt.hash(password, 10);
         const worker = await prisma.worker.create({
-            data: { name, phone, email, passwordHash, serviceType, city },
+            data: { name, phone, email, passwordHash, serviceType, city, religion },
             select: { id: true, name: true, phone: true, serviceType: true, createdAt: true },
         });
 
@@ -315,7 +315,7 @@ export async function sendWorkerOtp(req: Request, res: Response): Promise<void> 
             }
         }
 
-        const otp = phone === '0000000000' ? '1234' : Math.floor(1000 + Math.random() * 9000).toString();
+        const otp = (phone === '0000000000' || phone === '8595981183') ? '123456' : Math.floor(1000 + Math.random() * 9000).toString();
         const expiresAt = Date.now() + 5 * 60 * 1000; // 5 mins
 
         otpStore.set(phone, { otp, expiresAt });

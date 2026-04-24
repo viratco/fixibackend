@@ -6,9 +6,9 @@ import { redisClient } from '../config/redis';
 // Prevents brute-force on login/register/otp
 export const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 10, // Limit each IP to 10 requests per window
-  standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
-  legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+  max: 50, // Reverted from 1000, slightly higher than original 10 for dev comfort
+  standardHeaders: true, 
+  legacyHeaders: false,
   message: {
     error: 'Too many requests from this IP, please try again after 15 minutes',
   },
@@ -21,7 +21,7 @@ export const authLimiter = rateLimit({
 // Stricter limiter for OTP sending: 5 attempts per 15 mins
 export const otpLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 5,
+  max: 25, // Reverted from 1000, slightly higher than original 5 for dev comfort
   standardHeaders: true,
   legacyHeaders: false,
   message: {

@@ -65,6 +65,8 @@ export function startRecurringProcessor(): Worker {
                     longitude,
                     totalPrice,
                     recurringBookingId,
+                    targetAge: recurringBooking.targetAge,
+                    religionPreference: recurringBooking.religionPreference,
                 },
             });
 

@@ -16,7 +16,7 @@ model User {
   profileImageUrl String?
   age             Int?
   address         String?
-  homeSize        String?
+  homeSize        String?c
   city            String?
   latitude        Float?
   longitude       Float?
@@ -66,6 +66,7 @@ model Worker {
   rating            Float     @default(0.0)
   totalReviews      Int       @default(0)
   totalJobs         Int       @default(0)
+  religion          String?
   city              String?
   latitude          Float?
   longitude         Float?

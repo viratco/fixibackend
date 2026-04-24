@@ -50,7 +50,7 @@ export async function getWorkers(req: Request, res: Response) {
 
 export async function addWorker(req: Request, res: Response) {
     try {
-        const { phone, name, serviceType } = req.body;
+        const { phone, name, serviceType, religion } = req.body;
         
         if (!phone || !name || !serviceType) {
             res.status(400).json({ error: 'Phone, name, and service type are required' });
@@ -71,6 +71,7 @@ export async function addWorker(req: Request, res: Response) {
                 name,
                 serviceType,
                 passwordHash,
+                religion,
                 rating: 5.0, // Default for new pro
                 totalJobs: 0
             }

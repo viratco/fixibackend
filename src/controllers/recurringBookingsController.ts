@@ -21,8 +21,8 @@ export async function createRecurringBooking(req: Request, res: Response): Promi
             religionPreference,
         } = req.body;
 
-        if (!serviceId || !monthsCount || !startDate || !address || !startTime) {
-            res.status(400).json({ error: 'serviceId, monthsCount, startDate, startTime, and address are required' });
+        if (!serviceId || !monthsCount || !startDate || !startTime) {
+            res.status(400).json({ error: 'serviceId, monthsCount, startDate, and startTime are required' });
             return;
         }
 
@@ -45,24 +45,50 @@ export async function createRecurringBooking(req: Request, res: Response): Promi
         const dailyPrice = service.priceHourly * parseFloat(String(dailyHours));
         const totalPrice = parseFloat((dailyPrice * totalDays).toFixed(2));
 
-        // ── Smart Address Resolution ──────────────────────────────────────────────
-        let finalAddressLine = address;
-        let finalLatitude = latitude !== undefined && latitude !== null ? parseFloat(latitude as any) : undefined;
-        let finalLongitude = longitude !== undefined && longitude !== null ? parseFloat(longitude as any) : undefined;
-        let resolvedAddressId: string | undefined = addressId;
+        // ── Smart Address Resolution (3-level fallback) ───────────────────────────
+        // Level 0: Sanitize — treat literal "undefined" / "null" strings as missing
+        const isInvalid = (v: any) => !v || v === 'undefined' || v === 'null';
 
-        // Note: For recurring we don't fallback to default if payload is missing (different from createBooking)
-        // because frontend always requires passing an address explicitly before scheduling.
+        let finalAddressLine: string | undefined = isInvalid(address) ? undefined : address as string;
+        let finalLatitude: number | undefined = (!isInvalid(latitude)) ? parseFloat(latitude as any) : undefined;
+        let finalLongitude: number | undefined = (!isInvalid(longitude)) ? parseFloat(longitude as any) : undefined;
+        let resolvedAddressId: string | undefined = isInvalid(addressId) ? undefined : addressId as string;
+
+        // Level 1: If an addressId was provided (and not bogus), look it up and fill any gaps
         if (resolvedAddressId) {
             const specificAddress = await prisma.address.findFirst({
                 where: { id: resolvedAddressId, userId }
             });
             if (specificAddress) {
-                finalAddressLine = finalAddressLine || specificAddress.addressLine;
+                if (!finalAddressLine) finalAddressLine = specificAddress.addressLine + (specificAddress.landmark ? `, ${specificAddress.landmark}` : '');
                 if (finalLatitude === undefined) finalLatitude = specificAddress.latitude;
                 if (finalLongitude === undefined) finalLongitude = specificAddress.longitude;
             } else {
-                resolvedAddressId = undefined; // ID was invalid
+                resolvedAddressId = undefined; // ID was invalid, clear it
+            }
+        }
+
+        // Level 2: If address is still missing, fallback to user's default saved address
+        if (!finalAddressLine) {
+            const defaultAddr = await prisma.address.findFirst({
+                where: { userId },
+                orderBy: [{ isDefault: 'desc' }, { createdAt: 'desc' }],
+            });
+            if (defaultAddr) {
+                finalAddressLine = defaultAddr.addressLine + (defaultAddr.landmark ? `, ${defaultAddr.landmark}` : '');
+                if (finalLatitude === undefined) finalLatitude = defaultAddr.latitude;
+                if (finalLongitude === undefined) finalLongitude = defaultAddr.longitude;
+                resolvedAddressId = defaultAddr.id;
+            }
+        }
+
+        // Level 3: Last resort — use the address from the user's profile
+        if (!finalAddressLine) {
+            const userProfile = await prisma.user.findUnique({ where: { id: userId } });
+            if (userProfile?.address) {
+                finalAddressLine = userProfile.address;
+                if (finalLatitude === undefined && userProfile.latitude) finalLatitude = userProfile.latitude;
+                if (finalLongitude === undefined && userProfile.longitude) finalLongitude = userProfile.longitude;
             }
         }
 
@@ -76,7 +102,7 @@ export async function createRecurringBooking(req: Request, res: Response): Promi
                 endDate: end,
                 dailyHours: parseFloat(String(dailyHours)),
                 startTime,
-                address: finalAddressLine,
+                address: finalAddressLine ?? 'Address not available',
                 city,
                 latitude: finalLatitude,
                 longitude: finalLongitude,
@@ -100,7 +126,7 @@ export async function createRecurringBooking(req: Request, res: Response): Promi
             start,
             end,
             parseFloat(String(dailyHours)),
-            finalAddressLine,
+            finalAddressLine ?? 'Address not available',
             city,
             finalLatitude,
             finalLongitude,

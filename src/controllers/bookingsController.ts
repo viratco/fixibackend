@@ -361,12 +361,34 @@ export async function getWorkerActiveJob(req: Request, res: Response): Promise<v
             }
             : {}; // no serviceType → see all services
 
+        // ── Religion filter ──
+        // If customer selects 'Any', all workers see it.
+        // If customer selects 'Hindu', only Hindu workers see it.
+        // If customer selects 'Other', only Other workers see it.
+        const religionFilter = worker?.religion
+            ? {
+                  OR: [
+                      { religionPreference: { equals: 'any', mode: 'insensitive' as any } },
+                      { religionPreference: { equals: worker.religion, mode: 'insensitive' as any } },
+                      { religionPreference: null },
+                      { religionPreference: '' }
+                  ]
+              }
+            : {
+                  OR: [
+                      { religionPreference: { equals: 'any', mode: 'insensitive' as any } },
+                      { religionPreference: null },
+                      { religionPreference: '' }
+                  ]
+              };
+
         const pending = await prisma.booking.findMany({
             where: {
                 status: 'pending',
                 workerId: null,
                 AND: [
                     cityFilter,
+                    religionFilter,
                     {
                         OR: [
                             { bookingType: 'HOURLY' as any },
