@@ -83,3 +83,38 @@ export async function addWorker(req: Request, res: Response) {
         res.status(500).json({ error: 'Failed to add worker' });
     }
 }
+
+export async function getServices(req: Request, res: Response) {
+    try {
+        const services = await prisma.service.findMany({
+            orderBy: { name: 'asc' }
+        });
+        res.json(services);
+    } catch (error) {
+        console.error('Error fetching services:', error);
+        res.status(500).json({ error: 'Failed to fetch services' });
+    }
+}
+
+export async function updateService(req: Request, res: Response) {
+    try {
+        const { id } = req.params;
+        const { priceHourly, priceMonthly, basePricePerHour, minHours, isActive } = req.body;
+
+        const updated = await prisma.service.update({
+            where: { id },
+            data: {
+                priceHourly: priceHourly !== undefined ? parseFloat(priceHourly) : undefined,
+                priceMonthly: priceMonthly !== undefined ? parseFloat(priceMonthly) : undefined,
+                basePricePerHour: basePricePerHour !== undefined ? parseFloat(basePricePerHour) : undefined,
+                minHours: minHours !== undefined ? parseInt(minHours) : undefined,
+                isActive: isActive !== undefined ? !!isActive : undefined
+            }
+        });
+
+        res.json({ message: 'Service updated successfully', service: updated });
+    } catch (error) {
+        console.error('Error updating service:', error);
+        res.status(500).json({ error: 'Failed to update service' });
+    }
+}

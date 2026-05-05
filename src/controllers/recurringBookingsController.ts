@@ -46,11 +46,18 @@ export async function createRecurringBooking(req: Request, res: Response): Promi
         // Total number of days = difference in days (approx monthsCount * 30)
         const totalDays = Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
 
-        // ── Total price = daily price * number of days ─────────────────
-        // Fallback to basePricePerHour if priceHourly is missing or 0
-        const hourlyRate = service.priceHourly || (service as any).basePricePerHour || 0;
-        const dailyPrice = hourlyRate * parseFloat(String(dailyHours));
-        const totalPrice = parseFloat((dailyPrice * totalDays).toFixed(2));
+        // ── Total price calculation ──────────────────────────────────
+        // 1. Check if the service has a fixed monthly price
+        // 2. If not, fallback to daily price * number of days
+        let totalPrice = 0;
+        if (service.priceMonthly && service.priceMonthly > 0) {
+            // Use fixed monthly price (pro-rated by monthsCount)
+            totalPrice = service.priceMonthly * parseInt(monthsCount);
+        } else {
+            const hourlyRate = service.priceHourly || (service as any).basePricePerHour || 0;
+            const dailyPrice = hourlyRate * parseFloat(String(dailyHours));
+            totalPrice = parseFloat((dailyPrice * totalDays).toFixed(2));
+        }
 
         // ── Smart Address Resolution (3-level fallback) ───────────────────────────
         // Level 0: Sanitize — treat literal "undefined" / "null" strings as missing

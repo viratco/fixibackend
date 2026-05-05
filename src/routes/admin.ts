@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { getUsers, getBookings, getWorkers, addWorker } from '../controllers/adminController';
+import { getUsers, getBookings, getWorkers, addWorker, getServices, updateService } from '../controllers/adminController';
 
 const router = Router();
 
@@ -10,5 +10,7 @@ router.get('/users', getUsers);
 router.get('/bookings', getBookings);
 router.get('/workers', getWorkers);
 router.post('/workers', addWorker);
+router.get('/services', getServices);
+router.patch('/services/:id', updateService);
 
 export default router;
