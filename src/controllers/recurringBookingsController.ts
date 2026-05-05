@@ -169,7 +169,7 @@ export async function getMyRecurringBookings(req: Request, res: Response): Promi
             where: { userId },
             orderBy: { createdAt: 'desc' },
             include: {
-                service: { select: { name: true, iconName: true, category: true } },
+                service: { select: { name: true, iconName: true, category: true, priceMonthly: true, basePricePerHour: true } },
                 bookings: {
                     select: {
                         id: true, status: true, scheduledAt: true, totalPrice: true,
