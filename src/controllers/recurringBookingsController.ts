@@ -196,7 +196,7 @@ export async function getRecurringBookingById(req: Request, res: Response): Prom
         const recurringBooking = await prisma.recurringBooking.findFirst({
             where: { id, userId },
             include: {
-                service: { select: { name: true, iconName: true, category: true, priceHourly: true } },
+                service: { select: { name: true, iconName: true, category: true, priceHourly: true, priceMonthly: true, basePricePerHour: true } },
                 bookings: {
                     select: {
                         id: true, status: true, scheduledAt: true, totalPrice: true,
